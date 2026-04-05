@@ -1,0 +1,213 @@
+---
+// [page.index.fetch.1]
+const profilerHttpUrl = import.meta.env.PUBLIC_PROFILER_HTTP_URL || 'http://localhost:7701';
+
+let sessions = [];
+try {
+  const response = await fetch(`${profilerHttpUrl}/api/sessions`);
+  if (response.ok) {
+    sessions = await response.json();
+  } else {
+    console.warn('[index] Failed to fetch sessions:', response.statusText);
+  }
+} catch (error) {
+  console.error('[index] Error fetching sessions:', error);
+  // Fallback mock data
+  sessions = [];
+}
+
+// [page.index.layout.1]
+const title = 'code-heat Dashboard';
+
+// Helper function to format date
+function formatDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleString();
+}
+
+// Helper function to calculate duration
+function calculateDuration(startTime: number): number {
+  return Math.floor((Date.now() - startTime) / 1000);
+}
+
+// Helper function to get heat color
+function heatScoreToRgba(score: number): string {
+  const clampedScore = Math.max(0, Math.min(1, score));
+  if (clampedScore < 0.2) return 'rgba(34, 197, 94, 0.8)';
+  if (clampedScore < 0.4) return 'rgba(134, 197, 34, 0.8)';
+  if (clampedScore < 0.6) return 'rgba(249, 115, 22, 0.8)';
+  if (clampedScore < 0.8) return 'rgba(239, 68, 68, 0.8)';
+  return 'rgba(220, 38, 38, 0.8)';
+}
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- [page.index.refresh.1] -->
+    <meta http-equiv="refresh" content="5" />
+    <title>{title}</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #1e1e1e;
+        color: #e0e0e0;
+        padding: 40px 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        color: #ffffff;
+        margin-bottom: 32px;
+        font-size: 32px;
+        font-weight: 600;
+      }
+
+      /* [page.index.style.1] */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #252526;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      thead {
+        background: #2d2d2d;
+      }
+
+      th {
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        color: #e0e0e0;
+        border-bottom: 1px solid #404040;
+        font-size: 14px;
+      }
+
+      tbody tr {
+        border-bottom: 1px solid #404040;
+        transition: background 0.15s ease;
+      }
+
+      /* [page.index.links.1] */
+      tbody tr:hover {
+        background: #2d2d2d;
+        cursor: pointer;
+      }
+
+      td {
+        padding: 12px;
+        font-size: 13px;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      .badge-active {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+      }
+
+      .badge-stopped {
+        background: rgba(107, 114, 128, 0.2);
+        color: #9ca3af;
+      }
+
+      .heat-bar-container {
+        width: 100px;
+        height: 16px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .heat-bar {
+        height: 100%;
+        transition: width 0.3s ease;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        color: #999;
+        font-size: 16px;
+      }
+
+      .monospace {
+        font-family: 'Monaco', 'Courier New', monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- [page.index.layout.1] -->
+      <h1>code-heat Dashboard</h1>
+
+      {sessions.length === 0 ? (
+        <!-- [page.index.table.1] -->
+        <div class="empty-state">
+          No sessions running
+        </div>
+      ) : (
+        <!-- [page.index.table.1] -->
+        <table>
+          <thead>
+            <tr>
+              <th>Target</th>
+              <th>Status</th>
+              <th>Started</th>
+              <th>Duration</th>
+              <th>Total Samples</th>
+              <th>Top File</th>
+              <th>Heat Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sessions.map((session: any) => (
+              <!-- [page.index.links.1] -->
+              <tr onclick={`window.location.href='/session/${session.id}'`}>
+                <td class="monospace">{session.target || '—'}</td>
+                <td>
+                  <span class={`badge ${session.status === 'active' ? 'badge-active' : 'badge-stopped'}`}>
+                    {session.status === 'active' ? 'Active' : 'Stopped'}
+                  </span>
+                </td>
+                <td>{formatDate(session.startTime)}</td>
+                <td class="monospace">{calculateDuration(session.startTime)}s</td>
+                <td class="monospace">{session.totalSamples || 0}</td>
+                <td class="monospace" title={session.topFile}>{session.topFile || '—'}</td>
+                <td>
+                  <!-- [page.index.table.1] -->
+                  <div class="heat-bar-container">
+                    <div
+                      class="heat-bar"
+                      style={`width: ${(session.maxScore || 0) * 100}%; background: ${heatScoreToRgba(session.maxScore || 0)};`}
+                    />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  </body>
+</html>

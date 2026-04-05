@@ -1,0 +1,83 @@
+# [proj.docker.1.1] Three services: dashboard, profiler, and redis
+# [proj.docker.1.2] All services share traefik external network for reverse proxy routing
+
+services:
+  # [proj.docker.1.4] Dashboard Service
+  dashboard:
+    # [proj.docker.1.5] Build context: ./packages/dashboard
+    build:
+      context: ./packages/dashboard
+      dockerfile: Dockerfile
+
+    # [proj.docker.1.6] Exposed port 4321 mapped to host 4321
+    ports:
+      - "4321:4321"
+
+    environment:
+      # [proj.docker.1.7] Environment variable PROFILER_WS_URL
+      - PROFILER_WS_URL=ws://profiler:7700
+      # [proj.docker.1.8] Environment variable PROFILER_HTTP_URL
+      - PROFILER_HTTP_URL=http://profiler:7701
+
+    networks:
+      - default
+      - traefik
+
+    # [proj.docker.1.9] Traefik labels: enable routing to code-heat.pow with entrypoint web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.code-heat.rule=Host(`code-heat.pow`)"
+      - "traefik.http.routers.code-heat.entrypoints=web"
+      - "traefik.http.services.code-heat.loadbalancer.server.port=4321"
+
+    depends_on:
+      - profiler
+
+  # [proj.docker.1.10] Profiler Service
+  profiler:
+    # [proj.docker.1.11] Build context: ./packages/profiler
+    build:
+      context: ./packages/profiler
+      dockerfile: Dockerfile
+
+    # [proj.docker.1.12] Expose ports 7700 (WebSocket profiler server) and 7701 (HTTP profiler API)
+    # [proj.docker.1.13] Expose port 7700 (WebSocket profiler server) mapped to host 7700 and port 7701 (HTTP profiler API) mapped to host 7701
+    ports:
+      - "7700:7700"
+      - "7701:7701"
+
+    environment:
+      # [proj.docker.1.14] Environment variable TARGET_HOST
+      - TARGET_HOST=host.docker.internal
+      # [proj.docker.1.15] Environment variable TARGET_PORT
+      - TARGET_PORT=9229
+      # [proj.docker.1.16] Environment variable REDIS_URL
+      - REDIS_URL=redis://redis:6379
+
+    networks:
+      - default
+
+    depends_on:
+      - redis
+
+  # [proj.docker.1.17] Redis Service
+  redis:
+    # [proj.docker.1.18] Image: redis:7-alpine
+    image: redis:7-alpine
+
+    # [proj.docker.1.19] Port 6379 exposed internally
+    expose:
+      - "6379"
+
+    networks:
+      - default
+
+# [proj.docker.1.20] All services must connect to traefik external network
+# [proj.docker.1.21] Networks definition: traefik is external: true
+# [proj.docker.1.22] Default bridge network used for inter-service communication
+# [proj.docker.1.3] Services communicate via internal Docker network and container hostnames
+networks:
+  traefik: # [proj.docker.1.21]
+    external: true
+  default: # [proj.docker.1.22]
+    driver: bridge

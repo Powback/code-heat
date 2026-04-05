@@ -1,0 +1,23 @@
+{ // [proj.root.pkg.1.1]
+  "_comment_proj.root.pkg.1.1": "Package name must be code-heat",
+  "name": "code-heat", // [proj.root.pkg.1.1]
+  "_comment_proj.root.pkg.1.2": "Set private flag to true (monorepo root is not published)",
+  "private": true, // [proj.root.pkg.1.2]
+  "_comment_proj.root.pkg.1.3": "Module type must be module (ES6 modules)",
+  "type": "module", // [proj.root.pkg.1.3]
+  "version": "0.1.0",
+  "description": "Real-time Node.js profiler with heatmap visualization",
+  "_comment_proj.root.pkg.1.4": "Package manager: pnpm with exact version constraint",
+  "packageManager": "pnpm@8.0.0", // [proj.root.pkg.1.4]
+  "scripts": {
+    "_comment_proj.root.pkg.1.5": "dev script: run all packages in parallel dev mode",
+    "dev": "pnpm run --parallel dev --filter './packages/*'", // [proj.root.pkg.1.5]
+    "_comment_proj.root.pkg.1.6": "build script: build all workspace packages recursively",
+    "build": "pnpm run --recursive build", // [proj.root.pkg.1.6]
+    "_comment_proj.root.pkg.1.7": "sample script: run sample app in development",
+    "sample": "pnpm --filter code-heat-sample run dev" // [proj.root.pkg.1.7]
+  },
+  "_comment_proj.root.pkg.1.8_1.9": "No dependencies at root level (dependencies managed per package, workspaces in pnpm-workspace.yaml)",
+  "dependencies": {}, // [proj.root.pkg.1.8]
+  "devDependencies": {} // [proj.root.pkg.1.9]
+}

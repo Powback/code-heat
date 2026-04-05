@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.astro/
+*.js.map
+*.d.ts
+.env
+.env.local
+
+# Spec2Code artifacts
+.ref-index-*.json
+.spec-session.json
+.spec-map.json
+.spec-task-combined-*.txt

@@ -1,0 +1,208 @@
+---
+// [page.session.route.1]
+const { id } = Astro.params;
+const sessionId = id || '';
+
+// [page.session.layout.1]
+const title = `Session ${sessionId} - code-heat`;
+const profilerWsUrl = import.meta.env.PUBLIC_PROFILER_WS_URL || 'ws://localhost:7700';
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #1e1e1e;
+        color: #e0e0e0;
+        overflow: hidden;
+      }
+
+      /* [page.session.layout.1] */
+      .layout {
+        display: grid;
+        grid-template-rows: 60px 1fr 150px;
+        grid-template-columns: 250px 1fr;
+        height: 100vh;
+      }
+
+      .stats-bar {
+        grid-column: 1 / -1;
+        grid-row: 1;
+      }
+
+      .file-tree {
+        grid-column: 1;
+        grid-row: 2 / 3;
+      }
+
+      .editor {
+        grid-column: 2;
+        grid-row: 2 / 3;
+        overflow: hidden;
+      }
+
+      .timeline {
+        grid-column: 1 / -1;
+        grid-row: 3;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <div class="stats-bar" id="stats-bar"></div>
+      <div class="file-tree" id="file-tree"></div>
+      <div class="editor" id="editor"></div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+
+    <!-- [page.session.client.1] -->
+    <script type="module">
+      import React, { useState, useEffect, useCallback } from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { WsClient } from '../lib/ws-client';
+      import { StatsBar } from '../components/StatsBar';
+      import { FileTree } from '../components/FileTree';
+      import { HeatmapEditor } from '../components/HeatmapEditor';
+      import { SessionTimeline } from '../components/SessionTimeline';
+
+      const sessionId = window.location.pathname.split('/').pop();
+      const wsUrl = '{profilerWsUrl}';
+
+      function SessionPage() {
+        // [page.session.state.1]
+        const [state, setState] = useState({
+          currentSession: undefined,
+          snapshot: undefined,
+          subscribedFile: undefined,
+          isConnected: false,
+          editorContent: '',
+          language: 'typescript',
+          files: [],
+          snapshots: [],
+        });
+
+        // [page.session.client.1]
+        useEffect(() => {
+          const wsClient = new WsClient(wsUrl, {
+            onSnapshot: (snapshot) => {
+              setState((prev) => ({
+                ...prev,
+                snapshot,
+                snapshots: [...prev.snapshots, snapshot],
+                files: buildFileTreeFromSnapshot(snapshot),
+              }));
+            },
+            onSessionStart: (session) => {
+              setState((prev) => ({ ...prev, currentSession: session }));
+            },
+            onSessionEnd: (summary) => {
+              console.log('Session ended:', summary);
+            },
+            onError: (error) => {
+              console.error('[SessionPage] WebSocket error:', error);
+              setState((prev) => ({ ...prev, isConnected: false }));
+            },
+          });
+
+          wsClient.connect()
+            .then(() => {
+              setState((prev) => ({ ...prev, isConnected: true }));
+              wsClient.subscribe(sessionId);
+            })
+            .catch((error) => {
+              console.error('[SessionPage] Failed to connect:', error);
+            });
+
+          // [page.session.cleanup.1]
+          return () => {
+            wsClient.unsubscribe(sessionId);
+            wsClient.disconnect();
+          };
+        }, []);
+
+        // [page.session.fileselect.1]
+        const handleFileSelect = useCallback(async (url) => {
+          try {
+            const response = await fetch(`/api/file?url=${encodeURIComponent(url)}`);
+            if (!response.ok) {
+              throw new Error(`Failed to fetch file: ${response.statusText}`);
+            }
+            const data = await response.json();
+            setState((prev) => ({
+              ...prev,
+              subscribedFile: url,
+              editorContent: data.content,
+              language: data.language,
+            }));
+          } catch (error) {
+            // [page.session.errors.1]
+            console.error('[SessionPage] Failed to load file:', error);
+          }
+        }, []);
+
+        // Helper to build file tree from snapshot
+        function buildFileTreeFromSnapshot(snapshot) {
+          if (!snapshot?.files) return [];
+
+          return snapshot.files.map((file) => ({
+            displayPath: file.filePath.replace(/^.*\//, ''),
+            fileScore: file.maxScore || 0,
+            lineCount: file.lines?.size || 0,
+            isHot: (file.maxScore || 0) > 0.6,
+            scriptUrl: file.filePath,
+          }));
+        }
+
+        // Get current file heat
+        const currentFileHeat = state.snapshot?.files?.find(
+          (f) => f.filePath === state.subscribedFile
+        );
+
+        return (
+          <>
+            <div className="stats-bar">
+              <StatsBar
+                session={state.currentSession}
+                snapshot={state.snapshot}
+                isConnected={state.isConnected}
+              />
+            </div>
+            <div className="file-tree">
+              <FileTree
+                files={state.files}
+                selectedUrl={state.subscribedFile}
+                onSelect={handleFileSelect}
+              />
+            </div>
+            <div className="editor">
+              <HeatmapEditor
+                fileUrl={state.subscribedFile || ''}
+                content={state.editorContent}
+                fileHeat={currentFileHeat}
+                language={state.language}
+              />
+            </div>
+            <div className="timeline">
+              <SessionTimeline snapshots={state.snapshots} maxPoints={60} />
+            </div>
+          </>
+        );
+      }
+
+      // Mount React app
+      const root = createRoot(document.getElementById('stats-bar').parentElement);
+      root.render(<SessionPage />);
+    </script>
+  </body>
+</html>
