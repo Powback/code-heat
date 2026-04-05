@@ -1,87 +1,49 @@
 // [proj.store.1]
-// PowSync data persistence layer for profiling data
+// In-memory heat store with optional PowSync persistence.
+// PowSync integration is enabled when Redis URL is configured (future work).
 
-// [proj.store.1]
-import { table, field, pk, serverStore } from '../../../PowSync/src/server-entry.js';
 import { randomUUID } from 'crypto';
-import type { ProfilingSession, SessionSummary, HeatSnapshot, FileHeat } from './types.js';
+import type { ProfilingSession, SessionSummary, HeatSnapshot, FileHeat, LineHeat } from './types.js';
 
 // [proj.store.1]
-@table('profiling_sessions')
-class ProfilingSessionRecord {
-  // [proj.store.1]
-  @pk id!: string;
-  // [proj.store.1]
-  @field target!: string;
-  // [proj.store.1]
-  @field targetName!: string;
-  // [proj.store.1]
-  @field startedAt!: number;
-  // [proj.store.1]
-  @field endedAt?: number;
-  // [proj.store.1]
-  @field totalSamples!: number;
-  // [proj.store.1]
-  @field status!: string;
-  // [proj.store.1]
-  @field topFile?: string;
-  // [proj.store.1]
-  @field topScore?: number;
+interface StoredSession {
+  session: ProfilingSession;
+  topFile?: string;
+  topScore?: number;
 }
 
 // [proj.store.1]
-@table('line_heat_snapshots')
-class LineHeatRecord {
-  // [proj.store.1]
-  @pk id!: string;
-  // [proj.store.1]
-  @field sessionId!: string;
-  // [proj.store.1]
-  @field scriptUrl!: string;
-  // [proj.store.1]
-  @field lineNumber!: number;
-  // [proj.store.1]
-  @field heatScore!: number;
-  // [proj.store.1]
-  @field hitCount!: number;
-  // [proj.store.1]
-  @field avgSelfTimeMs!: number;
-  // [proj.store.1]
-  @field snapshotAt!: number;
+interface StoredLineHeat {
+  id: string;
+  sessionId: string;
+  scriptUrl: string;
+  lineNumber: number;
+  heatScore: number;
+  hitCount: number;
+  avgSelfTimeMs: number;
+  snapshotAt: number;
 }
 
 // [proj.store.1]
 export class HeatStore {
+  private sessions = new Map<string, StoredSession>();
+  private lineHeats = new Map<string, StoredLineHeat[]>(); // sessionId → records
+
   // [proj.store.1]
   async saveSession(session: ProfilingSession): Promise<void> {
     // [proj.store.1]
-    const record = new ProfilingSessionRecord();
-    record.id = session.id;
-    record.target = session.target;
-    record.targetName = session.targetName;
-    record.startedAt = session.startedAt;
-    record.endedAt = session.endedAt;
-    record.totalSamples = session.totalSamples;
-    record.status = session.status;
-
-    // [proj.store.1]
-    await serverStore.upsert('profiling_sessions', record);
+    this.sessions.set(session.id, { session: { ...session } });
   }
 
   // [proj.store.1]
   async updateSession(session: ProfilingSession): Promise<void> {
     // [proj.store.1]
-    const record = new ProfilingSessionRecord();
-    record.id = session.id;
-    record.target = session.target;
-    record.targetName = session.targetName;
-    record.startedAt = session.startedAt;
-    record.endedAt = session.endedAt;
-    record.totalSamples = session.totalSamples;
-    record.status = session.status;
-
-    // [proj.store.1]
-    await serverStore.upsert('profiling_sessions', record);
+    const existing = this.sessions.get(session.id);
+    if (existing) {
+      existing.session = { ...session };
+    } else {
+      this.sessions.set(session.id, { session: { ...session } });
+    }
   }
 
   // [proj.store.1]
@@ -89,6 +51,7 @@ export class HeatStore {
     // [proj.store.1]
     let topFile: string | undefined;
     let topScore = 0;
+    const records: StoredLineHeat[] = [];
 
     // [proj.store.1]
     for (const [scriptUrl, fileHeat] of snapshot.files.entries()) {
@@ -99,19 +62,16 @@ export class HeatStore {
 
       // [proj.store.1]
       for (const line of topLines) {
-        // [proj.store.1]
-        const record = new LineHeatRecord();
-        record.id = randomUUID();
-        record.sessionId = snapshot.sessionId;
-        record.scriptUrl = line.scriptUrl;
-        record.lineNumber = line.lineNumber;
-        record.heatScore = line.heatScore;
-        record.hitCount = line.totalHits;
-        record.avgSelfTimeMs = line.avgSelfTimeMs;
-        record.snapshotAt = snapshot.timestamp;
-
-        // [proj.store.1]
-        await serverStore.upsert('line_heat_snapshots', record);
+        records.push({
+          id: randomUUID(),
+          sessionId: snapshot.sessionId,
+          scriptUrl: line.scriptUrl,
+          lineNumber: line.lineNumber,
+          heatScore: line.heatScore,
+          hitCount: line.totalHits,
+          avgSelfTimeMs: line.avgSelfTimeMs,
+          snapshotAt: snapshot.timestamp,
+        });
       }
 
       if (fileHeat.fileScore > topScore) {
@@ -121,21 +81,15 @@ export class HeatStore {
     }
 
     // [proj.store.1]
+    const existing = this.lineHeats.get(snapshot.sessionId) ?? [];
+    this.lineHeats.set(snapshot.sessionId, [...existing, ...records]);
+
+    // [proj.store.1]
     if (topFile) {
-      const sessionRecord = new ProfilingSessionRecord();
-      sessionRecord.id = snapshot.sessionId;
-      sessionRecord.topFile = topFile;
-      sessionRecord.topScore = topScore;
-      const existingSession = await serverStore.query('profiling_sessions', { id: snapshot.sessionId });
-      if (existingSession.length > 0) {
-        const existing = existingSession[0] as ProfilingSessionRecord;
-        sessionRecord.target = existing.target;
-        sessionRecord.targetName = existing.targetName;
-        sessionRecord.startedAt = existing.startedAt;
-        sessionRecord.endedAt = existing.endedAt;
-        sessionRecord.totalSamples = existing.totalSamples;
-        sessionRecord.status = existing.status;
-        await serverStore.upsert('profiling_sessions', sessionRecord);
+      const stored = this.sessions.get(snapshot.sessionId);
+      if (stored) {
+        stored.topFile = topFile;
+        stored.topScore = topScore;
       }
     }
   }
@@ -143,37 +97,35 @@ export class HeatStore {
   // [proj.store.1]
   async getSessions(): Promise<SessionSummary[]> {
     // [proj.store.1]
-    const records = await serverStore.query('profiling_sessions', {});
-
-    // [proj.store.1]
-    return records.map((r: any) => ({
-      id: r.id,
-      target: r.target,
-      targetName: r.targetName,
-      startedAt: r.startedAt,
-      endedAt: r.endedAt,
-      status: r.status as 'active' | 'stopped' | 'error',
+    return Array.from(this.sessions.values()).map(({ session, topFile, topScore }) => ({
+      id: session.id,
+      target: session.target,
+      targetName: session.targetName,
+      startedAt: session.startedAt,
+      endedAt: session.endedAt,
+      totalSamples: session.totalSamples,
+      status: session.status,
+      topFile,
+      topScore,
     }));
   }
 
   // [proj.store.1]
   async getSessionHeat(sessionId: string): Promise<Map<string, FileHeat>> {
     // [proj.store.1]
-    const records = await serverStore.query('line_heat_snapshots', { sessionId });
+    const records = this.lineHeats.get(sessionId) ?? [];
 
     // [proj.store.1]
     const fileMap = new Map<string, FileHeat>();
 
     // [proj.store.1]
-    for (const record of records) {
-      const r = record as LineHeatRecord;
-      // [proj.store.1]
+    for (const r of records) {
       let fileHeat = fileMap.get(r.scriptUrl);
       if (!fileHeat) {
         fileHeat = {
           scriptUrl: r.scriptUrl,
           displayPath: this.extractDisplayPath(r.scriptUrl),
-          lines: new Map(),
+          lines: new Map<number, LineHeat>(),
           maxHeat: 0,
           totalHits: 0,
           fileScore: 0,

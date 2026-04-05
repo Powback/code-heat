@@ -1,32 +1,16 @@
 {
   "compilerOptions": {
-    "_comment_proj.prof.tsconfig.1.1": "Target: ES2022 (modern JavaScript features)",
-    "target": "ES2022", // [proj.prof.tsconfig.1.1]
-    "_comment_proj.prof.tsconfig.1.2": "Module: NodeNext (Node.js ESM support)",
-    "module": "NodeNext", // [proj.prof.tsconfig.1.2]
-    "_comment_proj.prof.tsconfig.1.3": "Module resolution: NodeNext (Node.js module resolution algorithm)",
-    "moduleResolution": "NodeNext", // [proj.prof.tsconfig.1.3]
-
-    "_comment_proj.prof.tsconfig.1.4": "outDir: ./dist (compiled JavaScript output directory)",
-    "outDir": "./dist", // [proj.prof.tsconfig.1.4]
-    "_comment_proj.prof.tsconfig.1.5": "rootDir: ./src (TypeScript source root directory)",
-    "rootDir": "./src", // [proj.prof.tsconfig.1.5]
-
-    "_comment_proj.prof.tsconfig.1.6": "strict: true (enable all strict type checking options)",
-    "strict": true, // [proj.prof.tsconfig.1.6]
-
-    "_comment_proj.prof.tsconfig.1.7": "experimentalDecorators: true (enable decorator syntax support)",
-    "experimentalDecorators": true, // [proj.prof.tsconfig.1.7]
-    "_comment_proj.prof.tsconfig.1.8": "emitDecoratorMetadata: true (emit metadata for decorated declarations)",
-    "emitDecoratorMetadata": true, // [proj.prof.tsconfig.1.8]
-
-    "_comment_proj.prof.tsconfig.1.9": "resolveJsonModule: true (allow importing JSON files)",
-    "resolveJsonModule": true, // [proj.prof.tsconfig.1.9]
-    "_comment_proj.prof.tsconfig.1.10": "declaration: true (generate .d.ts declaration files)",
-    "declaration": true, // [proj.prof.tsconfig.1.10]
-    "_comment_proj.prof.tsconfig.1.11": "declarationMap: true (generate source maps for declarations)",
-    "declarationMap": true, // [proj.prof.tsconfig.1.11]
-
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true

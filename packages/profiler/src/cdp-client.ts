@@ -28,7 +28,7 @@ export class CdpClient extends EventEmitter {
       await this.client.Profiler.enable();
     } catch (err) {
       // [proj.cdp.1]
-      throw new Error(`CDP connection failed to ${host}:${port} - ${err.message}`);
+      throw new Error(`CDP connection failed to ${host}:${port} - ${(err as Error).message}`);
     }
   }
 
@@ -45,7 +45,7 @@ export class CdpClient extends EventEmitter {
       await this.client.Profiler.start();
     } catch (err) {
       // [proj.cdp.1]
-      throw new Error(`Failed to start profiling: ${err.message}`);
+      throw new Error(`Failed to start profiling: ${(err as Error).message}`);
     }
   }
 
@@ -62,7 +62,7 @@ export class CdpClient extends EventEmitter {
       return result.profile;
     } catch (err) {
       // [proj.cdp.1]
-      throw new Error(`Failed to stop profiling: ${err.message}`);
+      throw new Error(`Failed to stop profiling: ${(err as Error).message}`);
     }
   }
 
@@ -79,7 +79,7 @@ export class CdpClient extends EventEmitter {
       return result.scriptSource;
     } catch (err) {
       // [proj.cdp.1]
-      throw new Error(`Failed to get script source for ${scriptId}: ${err.message}`);
+      throw new Error(`Failed to get script source for ${scriptId}: ${(err as Error).message}`);
     }
   }
 

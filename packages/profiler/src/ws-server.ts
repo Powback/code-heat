@@ -1,7 +1,7 @@
 // [proj.ws.1]
 // WebSocket server for broadcasting heat profiling data
 
-import WebSocket from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 import type {
   WsMessage,
   HeatSnapshot,
@@ -17,13 +17,13 @@ import type {
 // [proj.ws.1]
 export class WsServer {
   private port: number;
-  private server: WebSocket.Server;
+  private server: WebSocketServer;
   private clients: Set<WebSocket>;
 
   // [proj.ws.1]
   constructor(port: number) {
     this.port = port;
-    this.server = new WebSocket.Server({ port });
+    this.server = new WebSocketServer({ port });
     this.clients = new Set();
   }
 
