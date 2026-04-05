@@ -87,11 +87,20 @@ export class WsServer {
 
   // [proj.ws.1]
   broadcastSnapshot(snapshot: HeatSnapshot): void {
-    // [proj.ws.1]
+    // [proj.ws.1] Convert Maps to plain objects for JSON serialization
+    const filesObj: Record<string, any> = {};
+    for (const [url, fileHeat] of snapshot.files.entries()) {
+      const linesObj: Record<number, any> = {};
+      for (const [lineNum, lineHeat] of fileHeat.lines.entries()) {
+        linesObj[lineNum] = lineHeat;
+      }
+      filesObj[url] = { ...fileHeat, lines: linesObj };
+    }
+    const serializable = { ...snapshot, files: filesObj };
     const msg: WsSnapshotMessage = {
       type: 'snapshot',
       sessionId: snapshot.sessionId,
-      payload: snapshot,
+      payload: serializable as any,
     };
     // [proj.ws.1]
     this.broadcast(msg);
